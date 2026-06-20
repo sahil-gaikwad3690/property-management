@@ -66,9 +66,18 @@
         <div class="field">
           <label for="status">Status</label>
           <select class="select" id="status">
-            <option>Available</option><option>Rented</option><option>Maintenance</option>
+            <option>Available</option><option>Rented</option><option>Sold</option><option>Maintenance</option>
           </select>
         </div>
+      </div>
+
+      <div class="field">
+        <label for="listing_type">Listing type</label>
+        <select class="select" id="listing_type">
+          <option value="Rent">For Rent</option>
+          <option value="Sale">For Sale</option>
+          <option value="Both">Both (Rent &amp; Sale)</option>
+        </select>
       </div>
 
       <div class="field">
@@ -101,9 +110,14 @@
           <input class="input" id="rent_amount" type="number" min="0" value="0">
         </div>
         <div class="field">
-          <label for="tenant_name">Current tenant <span style="color:var(--muted-2);font-weight:400">(optional)</span></label>
-          <input class="input" id="tenant_name" placeholder="Leave blank if vacant">
+          <label for="sale_price">Sale price (₹) <span style="color:var(--muted-2);font-weight:400">(if for sale)</span></label>
+          <input class="input" id="sale_price" type="number" min="0" value="0">
         </div>
+      </div>
+
+      <div class="field">
+        <label for="tenant_name">Current tenant <span style="color:var(--muted-2);font-weight:400">(optional)</span></label>
+        <input class="input" id="tenant_name" placeholder="Leave blank if vacant">
       </div>
 
       <div class="field">
@@ -159,9 +173,9 @@
 
     const body = {
       title: val("title").trim(), address: val("address").trim(), city: val("city").trim(),
-      type: val("type"), status: val("status"),
+      type: val("type"), status: val("status"), listing_type: val("listing_type"),
       bedrooms: num("bedrooms"), bathrooms: num("bathrooms"), area_sqft: num("area_sqft"),
-      rent_amount: num("rent_amount"), tenant_name: val("tenant_name").trim(),
+      rent_amount: num("rent_amount"), sale_price: num("sale_price"), tenant_name: val("tenant_name").trim(),
       description: val("description").trim(), image_url: val("image_url"),
     };
     const btn = document.getElementById("save");

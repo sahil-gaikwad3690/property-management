@@ -232,6 +232,44 @@ button { font-family: inherit; cursor: pointer; }
 .pill.s-available::before { background: var(--ok); }
 .pill.s-rented::before    { background: var(--warn); }
 .pill.s-maintenance::before { background: var(--busy); }
+.pill.s-sold::before { background: var(--busy); }
+
+/* Listing-type tag (For Sale / For Rent) — sits top-right of the media */
+.tag {
+  position: absolute; top: .8rem; right: .8rem;
+  font-size: .68rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+  padding: .3rem .6rem; border-radius: 999px; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+.tag.sale { background: var(--brass, #b8860b); color: #fff; }
+.tag.rent { background: var(--ink); color: #fff; }
+.tag.both { background: #1f7a5a; color: #fff; }
+
+/* Top-bar navigation links */
+.topnav { display: flex; gap: .35rem; margin-right: .4rem; }
+.topnav a {
+  font-size: .85rem; font-weight: 600; color: var(--muted);
+  padding: .45rem .7rem; border-radius: 8px; text-decoration: none;
+}
+.topnav a:hover { background: var(--emerald-sf, #f1f5f3); color: var(--ink); }
+.topnav a.active { color: var(--ink); background: var(--emerald-sf, #f1f5f3); }
+
+/* Inquiry rows */
+.inq-list { display: flex; flex-direction: column; gap: .8rem; }
+.inq {
+  background: #fff; border: 1px solid var(--line); border-radius: 12px;
+  padding: 1rem 1.15rem; display: flex; justify-content: space-between;
+  gap: 1rem; align-items: flex-start; flex-wrap: wrap;
+}
+.inq__main { flex: 1; min-width: 220px; }
+.inq__title { font-weight: 700; font-size: 1.02rem; }
+.inq__meta { font-size: .82rem; color: var(--muted); margin: .15rem 0 .5rem; }
+.inq__msg { font-size: .9rem; color: var(--ink); }
+.inq__side { display: flex; flex-direction: column; align-items: flex-end; gap: .5rem; }
+.inq__offer { font-family: var(--display); font-weight: 700; font-size: 1.15rem; }
+.badge { font-size: .72rem; font-weight: 700; padding: .25rem .6rem; border-radius: 999px; }
+.badge.pending { background: #fff4e0; color: #9a6700; }
+.badge.accepted { background: #e3f6ec; color: #1f7a5a; }
+.badge.declined { background: #fdeaea; color: #b42318; }
 
 .card__body { padding: 1.05rem 1.15rem 1.2rem; display: flex; flex-direction: column; flex: 1; }
 .card__type { font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; color: var(--brass); font-weight: 700; }

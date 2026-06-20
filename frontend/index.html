@@ -14,6 +14,11 @@
       <div class="brand__mark">E</div>
       <div class="brand__name">Estate</div>
     </a>
+    <nav class="topnav">
+      <a href="/dashboard" class="active">Dashboard</a>
+      <a href="/marketplace">Marketplace</a>
+      <a href="/inquiries">Inquiries</a>
+    </nav>
     <div class="topbar__right">
       <div class="who">
         <div class="nm" id="who-name">—</div>
@@ -69,6 +74,20 @@
     `;
   }
 
+  function listingTag(p) {
+    const t = p.listing_type || "Rent";
+    if (t === "Sale") return `<span class="tag sale">For Sale</span>`;
+    if (t === "Both") return `<span class="tag both">Sale + Rent</span>`;
+    return `<span class="tag rent">For Rent</span>`;
+  }
+
+  function priceBlock(p) {
+    const t = p.listing_type || "Rent";
+    if (t === "Sale") return `${inr(p.sale_price)}`;
+    if (t === "Both") return `${inr(p.sale_price)} <small>· ${inr(p.rent_amount)}/mo</small>`;
+    return `${inr(p.rent_amount)}<small> /mo</small>`;
+  }
+
   function card(p) {
     const media = p.image_url
       ? `<img src="${esc(p.image_url)}" alt="${esc(p.title)}" loading="lazy"
@@ -79,6 +98,7 @@
         <div class="card__media">
           ${media}
           <span class="pill ${statusClass(p.status)}">${esc(p.status)}</span>
+          ${listingTag(p)}
         </div>
         <div class="card__body">
           <div class="card__type">${esc(p.type)}</div>
@@ -89,7 +109,7 @@
           </div>
           <div class="card__specs">${specsIcon(p)}</div>
           <div class="card__foot">
-            <div class="card__rent">${inr(p.rent_amount)}<small> /mo</small></div>
+            <div class="card__rent">${priceBlock(p)}</div>
             <div class="card__actions">
               <a class="iconbtn" href="/update?id=${p.id}" title="Edit">
                 <svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg>

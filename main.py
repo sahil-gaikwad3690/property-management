@@ -176,6 +176,133 @@ def _owned_property(property_id: int, db: Session, user: models.User) -> models.
 
 
 # =====================================================================
+# MARKETPLACE  — browse properties listed for sale (any owner)
+# =====================================================================
+@app.get("/api/marketplace", response_model=List[schemas.PropertyOut])
+def marketplace(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Properties that are for sale, excluding the current user's own."""
+    return (
+        db.query(models.Property)
+        .filter(
+            models.Property.listing_type.in_(["Sale", "Both"]),
+            models.Property.status != "Sold",
+            models.Property.owner_id != current_user.id,
+        )
+        .order_by(models.Property.created_at.desc())
+        .all()
+    )
+
+
+# =====================================================================
+# INQUIRIES  — a buyer expresses interest / makes an offer on a sale
+# =====================================================================
+def _inquiry_out(inq: models.Inquiry) -> dict:
+    """Flatten an inquiry plus its property/buyer details for the response."""
+    return {
+        "id": inq.id,
+        "property_id": inq.property_id,
+        "buyer_id": inq.buyer_id,
+        "message": inq.message,
+        "offer_amount": inq.offer_amount,
+        "status": inq.status,
+        "created_at": inq.created_at,
+        "property_title": inq.property.title if inq.property else "",
+        "property_city": inq.property.city if inq.property else "",
+        "buyer_name": inq.buyer.full_name if inq.buyer else "",
+    }
+
+@app.post(
+    "/api/properties/{property_id}/inquiries",
+    response_model=schemas.InquiryOut,
+    status_code=201,
+)
+def create_inquiry(
+    property_id: int,
+    payload: schemas.InquiryCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    prop = db.query(models.Property).filter(models.Property.id == property_id).first()
+    if not prop or prop.listing_type not in ("Sale", "Both"):
+        raise HTTPException(status_code=404, detail="Property not available for sale")
+    if prop.owner_id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot inquire on your own property")
+    inquiry = models.Inquiry(
+        property_id=property_id,
+        buyer_id=current_user.id,
+        message=payload.message,
+        offer_amount=payload.offer_amount,
+    )
+    db.add(inquiry)
+    db.commit()
+    db.refresh(inquiry)
+    return _inquiry_out(inquiry)
+
+
+@app.get("/api/inquiries/received", response_model=List[schemas.InquiryOut])
+def inquiries_received(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Inquiries other buyers sent on the current user's properties."""
+    rows = (
+        db.query(models.Inquiry)
+        .join(models.Property, models.Inquiry.property_id == models.Property.id)
+        .filter(models.Property.owner_id == current_user.id)
+        .order_by(models.Inquiry.created_at.desc())
+        .all()
+    )
+    return [_inquiry_out(i) for i in rows]
+
+
+@app.get("/api/inquiries/sent", response_model=List[schemas.InquiryOut])
+def inquiries_sent(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Inquiries the current user has sent as a buyer."""
+    rows = (
+        db.query(models.Inquiry)
+        .filter(models.Inquiry.buyer_id == current_user.id)
+        .order_by(models.Inquiry.created_at.desc())
+        .all()
+    )
+    return [_inquiry_out(i) for i in rows]
+
+
+@app.put("/api/inquiries/{inquiry_id}", response_model=schemas.InquiryOut)
+def respond_inquiry(
+    inquiry_id: int,
+    new_status: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Owner accepts or declines an inquiry on one of their properties."""
+    if new_status not in ("Accepted", "Declined"):
+        raise HTTPException(status_code=400, detail="status must be Accepted or Declined")
+    inquiry = (
+        db.query(models.Inquiry)
+        .join(models.Property, models.Inquiry.property_id == models.Property.id)
+        .filter(
+            models.Inquiry.id == inquiry_id,
+            models.Property.owner_id == current_user.id,
+        )
+        .first()
+    )
+    if not inquiry:
+        raise HTTPException(status_code=404, detail="Inquiry not found")
+    inquiry.status = new_status
+    if new_status == "Accepted":
+        inquiry.property.status = "Sold"
+    db.commit()
+    db.refresh(inquiry)
+    return _inquiry_out(inquiry)
+
+
+# =====================================================================
 # FRONTEND PAGES
 # =====================================================================
 def _page(name: str) -> FileResponse:
@@ -212,6 +339,16 @@ def page_update():
     return _page("update.html")
 
 
+@app.get("/marketplace")
+def page_marketplace():
+    return _page("marketplace.html")
+
+
+@app.get("/inquiries")
+def page_inquiries():
+    return _page("inquiries.html")
+
+
 # =====================================================================
 # DEMO SEED  — gives a logged-out visitor something nice to look at.
 # Login:  demo@rental.app  /  demo1234
@@ -239,6 +376,7 @@ def seed_demo():
             dict(title="Garden Villa 7", address="14 Koregaon Park Lane", city="Pune",
                  type="Villa", bedrooms=4, bathrooms=3, area_sqft=2800,
                  rent_amount=95000, status="Available", tenant_name="",
+                 listing_type="Sale", sale_price=42000000,
                  description="Spacious villa with a landscaped garden and covered parking for two cars.",
                  image_url="https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=900&q=80"),
             dict(title="Studio 04 — The Hive", address="9 Brigade Road", city="Bengaluru",
@@ -248,7 +386,8 @@ def seed_demo():
                  image_url="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=900&q=80"),
             dict(title="Riverside House", address="3 Boat Club Road", city="Pune",
                  type="House", bedrooms=3, bathrooms=2, area_sqft=1900,
-                 rent_amount=72000, status="Maintenance", tenant_name="",
+                 rent_amount=72000, status="Available", tenant_name="",
+                 listing_type="Both", sale_price=28500000,
                  description="Quiet riverside home currently undergoing a kitchen refit.",
                  image_url="https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=900&q=80"),
         ]

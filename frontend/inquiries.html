@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inquiries · Estate</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__in">
+    <a class="brand" href="/dashboard">
+      <div class="brand__mark">E</div>
+      <div class="brand__name">Estate</div>
+    </a>
+    <nav class="topnav">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/marketplace">Marketplace</a>
+      <a href="/inquiries" class="active">Inquiries</a>
+    </nav>
+    <div class="topbar__right">
+      <div class="who"><div class="nm" id="who-name">—</div><div class="rl">Property Owner</div></div>
+      <div class="avatar" id="who-avatar">?</div>
+      <button class="btn btn-ghost" id="logout">Log out</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap fade-in">
+  <div class="pagehead">
+    <div>
+      <span class="eyebrow">Buy &amp; sell</span>
+      <h1>Inquiries</h1>
+      <p>Offers you've received on your listings, and offers you've made.</p>
+    </div>
+  </div>
+
+  <section style="margin-bottom:2rem">
+    <h2 style="font-size:1.1rem;margin:0 0 .8rem">Received offers</h2>
+    <div id="received" class="inq-list"></div>
+  </section>
+
+  <section>
+    <h2 style="font-size:1.1rem;margin:0 0 .8rem">Offers you sent</h2>
+    <div id="sent" class="inq-list"></div>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+<script>
+  if (!requireAuth()) {}
+  const user = getUser() || {};
+  document.getElementById("who-name").textContent = user.full_name || "Owner";
+  document.getElementById("who-avatar").textContent = initials(user.full_name);
+  document.getElementById("logout").addEventListener("click", logout);
+
+  const recEl = document.getElementById("received");
+  const sentEl = document.getElementById("sent");
+
+  function badge(s) {
+    return `<span class="badge ${String(s).toLowerCase()}">${esc(s)}</span>`;
+  }
+
+  function receivedRow(i) {
+    const actions = i.status === "Pending"
+      ? `<div class="card__actions">
+           <button class="btn btn-primary" data-act="Accepted" data-id="${i.id}">Accept</button>
+           <button class="btn btn-ghost" data-act="Declined" data-id="${i.id}">Decline</button>
+         </div>`
+      : badge(i.status);
+    return `
+      <div class="inq">
+        <div class="inq__main">
+          <div class="inq__title">${esc(i.property_title)} <span style="color:var(--muted);font-weight:400">· ${esc(i.property_city)}</span></div>
+          <div class="inq__meta">From ${esc(i.buyer_name)}</div>
+          <div class="inq__msg">${esc(i.message) || "<em>No message</em>"}</div>
+        </div>
+        <div class="inq__side">
+          <div class="inq__offer">${inr(i.offer_amount)}</div>
+          ${actions}
+        </div>
+      </div>`;
+  }
+
+  function sentRow(i) {
+    return `
+      <div class="inq">
+        <div class="inq__main">
+          <div class="inq__title">${esc(i.property_title)} <span style="color:var(--muted);font-weight:400">· ${esc(i.property_city)}</span></div>
+          <div class="inq__meta">Your offer</div>
+          <div class="inq__msg">${esc(i.message) || "<em>No message</em>"}</div>
+        </div>
+        <div class="inq__side">
+          <div class="inq__offer">${inr(i.offer_amount)}</div>
+          ${badge(i.status)}
+        </div>
+      </div>`;
+  }
+
+  function emptyMsg(text) {
+    return `<div class="empty"><p>${text}</p></div>`;
+  }
+
+  async function load() {
+    try {
+      const [received, sent] = await Promise.all([
+        api("/api/inquiries/received"),
+        api("/api/inquiries/sent"),
+      ]);
+      recEl.innerHTML = received.length ? received.map(receivedRow).join("")
+                                        : emptyMsg("No one has made an offer on your listings yet.");
+      sentEl.innerHTML = sent.length ? sent.map(sentRow).join("")
+                                     : emptyMsg("You haven't made any offers. Browse the Marketplace to get started.");
+    } catch (e) {
+      recEl.innerHTML = emptyMsg("Couldn't load inquiries — " + esc(e.message));
+    }
+  }
+
+  recEl.addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    const { act, id } = btn.dataset;
+    if (act === "Accepted" && !confirm("Accept this offer? The property will be marked Sold.")) return;
+    btn.disabled = true;
+    try {
+      await api(`/api/inquiries/${id}?new_status=${act}`, { method: "PUT" });
+      load();
+    } catch (err) { alert(err.message); btn.disabled = false; }
+  });
+
+  load();
+</script>
+</body>
+</html>
