@@ -16,3 +16,18 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def ensure_schema():
+    """Tiny migration for the existing SQLite file.
+
+    SQLAlchemy's create_all() only creates missing *tables*, not missing
+    columns on tables that already exist. Add columns introduced after the
+    DB was first created so old rental.db files keep working.
+    """
+    from sqlalchemy import inspect, text
+
+    with engine.begin() as conn:
+        cols = {c["name"] for c in inspect(conn).get_columns("users")}
+        if "google_id" not in cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN google_id VARCHAR"))

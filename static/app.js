@@ -35,6 +35,50 @@ async function api(path, options = {}) {
   return res.json();
 }
 
+/* Sign in with Google (Google Identity Services).
+   Fetches the client ID from the backend, renders the official button into
+   `containerId`, and on success exchanges the Google credential for an app
+   session, then redirects to the dashboard. `onError(msg)` is optional. */
+async function setupGoogleSignIn(containerId, onError) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  let clientId = "";
+  try {
+    const cfg = await api("/api/config");
+    clientId = cfg.google_client_id;
+  } catch { /* ignore — handled below */ }
+  if (!clientId) { container.style.display = "none"; return; }
+
+  function ready() {
+    /* global google */
+    google.accounts.id.initialize({
+      client_id: clientId,
+      callback: async (response) => {
+        try {
+          const data = await api("/api/auth/google", {
+            method: "POST",
+            body: JSON.stringify({ credential: response.credential }),
+          });
+          saveSession(data.access_token, data.user);
+          location.href = "/dashboard";
+        } catch (e) {
+          if (onError) onError(e.message);
+        }
+      },
+    });
+    google.accounts.id.renderButton(container, {
+      theme: "outline", size: "large", width: 320, text: "continue_with",
+    });
+  }
+
+  if (window.google && google.accounts) ready();
+  else {
+    const wait = setInterval(() => {
+      if (window.google && google.accounts) { clearInterval(wait); ready(); }
+    }, 100);
+  }
+}
+
 /* Formatting */
 function inr(n) {
   return "₹" + Number(n || 0).toLocaleString("en-IN");

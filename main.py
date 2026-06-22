@@ -20,9 +20,10 @@ from sqlalchemy.orm import Session
 import models
 import schemas
 from auth import (
-    hash_password, verify_password, create_access_token, get_current_user
+    hash_password, verify_password, create_access_token, get_current_user,
+    verify_google_token, GOOGLE_CLIENT_ID,
 )
-from database import Base, engine, get_db, SessionLocal
+from database import Base, engine, get_db, SessionLocal, ensure_schema
 
 # ---- Paths ----
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -32,6 +33,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ---- Create tables ----
 Base.metadata.create_all(bind=engine)
+ensure_schema()
 
 app = FastAPI(title="Property Rental Management System")
 
@@ -72,6 +74,40 @@ def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     token = create_access_token(user.id)
     return {"access_token": token, "token_type": "bearer", "user": user}
+
+
+@app.post("/api/auth/google", response_model=schemas.Token)
+def google_auth(payload: schemas.GoogleAuth, db: Session = Depends(get_db)):
+    """Sign in (or sign up) with a Google ID token from the frontend.
+
+    The token is verified against Google; we then find the user by google_id
+    or email, creating an account on first sign-in, and issue our own JWT.
+    """
+    claims = verify_google_token(payload.credential)
+    google_id = claims["sub"]
+    email = claims["email"]
+    full_name = claims.get("name") or email.split("@")[0]
+
+    user = db.query(models.User).filter(models.User.google_id == google_id).first()
+    if not user:
+        # Link Google to an existing password account with the same email, if any.
+        user = db.query(models.User).filter(models.User.email == email).first()
+        if user:
+            user.google_id = google_id
+        else:
+            user = models.User(full_name=full_name, email=email, google_id=google_id)
+            db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    token = create_access_token(user.id)
+    return {"access_token": token, "token_type": "bearer", "user": user}
+
+
+@app.get("/api/config")
+def config():
+    """Public client config — lets the static frontend know the Google client ID."""
+    return {"google_client_id": GOOGLE_CLIENT_ID}
 
 
 @app.get("/api/me", response_model=schemas.UserOut)

@@ -15,6 +15,11 @@ class UserLogin(BaseModel):
     password: str
 
 
+class GoogleAuth(BaseModel):
+    # The ID token ("credential") returned by Google Identity Services.
+    credential: str
+
+
 class UserOut(BaseModel):
     id: int
     full_name: str
